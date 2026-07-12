@@ -1,5 +1,23 @@
 #include "../src/include/tiny.h"
 
+const char *get_content_type(const char *path) {
+    const char *ext = strrchr(path, '.');
+
+    if (ext == NULL) {
+        return "application/octet-stream";
+    }
+
+    size_t count = sizeof(mime_types) / sizeof(mime_types[0]);
+
+    for (size_t i = 0; i < count; i++) {
+        if (strcmp(ext, mime_types[i].ext) == 0) {
+            return mime_types[i].type;
+        }
+    }
+
+    return "application/octet-stream";
+}
+
 int path_to_int(const char *path) {
     // printf("path is %s\n", path);
     if (strcmp(path, "/") == 0)
@@ -13,7 +31,7 @@ int path_to_int(const char *path) {
     return 0; // default case
 }
 
-char *parse_path(const char *path) {
+const char *parse_path(const char *path) {
     int val = path_to_int(path);
 
     switch (val) {
@@ -47,42 +65,45 @@ int send_all(int s, const char *buf, size_t len) {
 void send_file(int sock_fd, const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f) {
-        const char *err = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
+        const char *err = "HTTP/1.1 404 Not Found\r\n"
+                          "Content-Length: 0\r\n"
+                          "Connection: close\r\n"
+                          "\r\n";
         send_all(sock_fd, (char *)err, strlen(err));
-        close(sock_fd);
         return;
     }
     // find file size
     fseek(f, 0, SEEK_END);
-    long size = ftell(f);
+    off_t size = ftello(f);
     fseek(f, 0, SEEK_SET);
 
     char header[256];
+    const char *content_type = get_content_type(path);
+
     snprintf(header, sizeof(header),
              "HTTP/1.1 200 OK\r\n"
              "Content-Type: %s\r\n"
              "Content-Length: %ld\r\n"
+             "Connection: close\r\n"
+             "Server: Tiny\r\n"
              "\r\n",
-             strstr(path, ".png") ? "image/png" : strstr(path, ".woff") ? "font/woff"
-                                                                        : "text/html",
+             content_type,
              size);
     size_t hlen = strlen(header);
     if (send_all(sock_fd, header, hlen) == -1) {
         fclose(f);
-        close(sock_fd);
         return;
     }
 
     char buf[BUFFER_SIZE] = {0};
     size_t n_read = 0;
-    while ((n_read = fread(buf, sizeof(buf[0]), BUFFER_SIZE, f)) > 0) {
+    while ((n_read = fread(buf, 1, sizeof(buf), f)) > 0) {
         if (send_all(sock_fd, buf, n_read) == -1) {
-            perror("send");
+            perror("Tiny > send");
             break;
         }
     }
     fclose(f);
-    close(sock_fd);
 }
 
 void sigchld_handler(int s) {
@@ -124,25 +145,25 @@ int main() {
     hints.ai_flags = AI_PASSIVE; // use my IP
 
     if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+        fprintf(stderr, "Tiny > getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
     }
 
     // loop through all the results and bind to the first we can
     for (p = servinfo; p != NULL; p = p->ai_next) {
         if ((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-            perror("server: socket");
+            perror("Tiny > socket");
             continue;
         }
 
         if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-            perror("setsockopt");
+            perror("Tiny > setsockopt");
             exit(EXIT_FAILURE);
         }
 
         if (bind(sock_fd, p->ai_addr, p->ai_addrlen) == -1) {
             close(sock_fd);
-            perror("server: bind");
+            perror("Tiny > bind");
             continue;
         }
         break;
@@ -151,7 +172,7 @@ int main() {
     freeaddrinfo(servinfo); // all done with this structure
 
     if (p == NULL) {
-        fprintf(stderr, "server: failed to bind\n");
+        fprintf(stderr, "Tiny > failed to bind\n");
         exit(EXIT_FAILURE);
     }
 
@@ -168,7 +189,7 @@ int main() {
         exit(1);
     }
 
-    printf("server: waiting for connections...\n");
+    printf("Tiny > waiting for connections...\n");
 
     while (1) {
         sin_size = sizeof(their_addr);
@@ -178,7 +199,7 @@ int main() {
         }
 
         inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof(s));
-        printf("server: got connection from %s\n", s);
+        printf("Tiny > got connection from %s\n", s);
         if (!fork()) {
             close(sock_fd); // child does not need the listner
 
@@ -200,13 +221,26 @@ int main() {
             protocol = token;
 
             if (strcmp(method, "GET") != 0) {
-                printf("method not GET");
-                continue;
+                const char *err = "HTTP/1.1 405 Method Not Allowed\r\n"
+                                  "Content-Length: 0\r\n"
+                                  "Connection: close\r\n"
+                                  "\r\n";
+                send_all(new_fd, (char *)err, strlen(err));
+                close(new_fd);
+                exit(0);
             }
 
             const char *file = parse_path(path);
-            send_file(new_fd, file);
-            // child closes his copy of new_fd
+            if (file == NULL) {
+                const char *err =
+                    "HTTP/1.1 404 Not Found\r\n"
+                    "Content-Length: 0\r\n"
+                    "Connection: close\r\n"
+                    "\r\n";
+                send_all(new_fd, err, strlen(err));
+            } else {
+                send_file(new_fd, file);
+            }
             close(new_fd);
             exit(0);
         }

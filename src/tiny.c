@@ -138,13 +138,29 @@ int main() {
     char *path;
     char *protocol;
     int rv, numbytes;
-
+    // When running under systemd, stdout may be buffered.
+    // This should fix this.
+    setvbuf(stdout, NULL, _IONBF, 0);
+    //*
+    // Let Mail-in-a-box with nginx be infront of my server and forward traffic
+    //                 Internet
+    //                   |
+    //                   |
+    //             nginx :80/:443
+    //         (Mail-in-a-Box managed)
+    //                   |
+    //                   |
+    //            127.0.0.1:3490
+    //                   |
+    //                   |
+    //             Tiny C server
+    //*
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
+    hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE; // use my IP
+    // hints.ai_flags = AI_PASSIVE; // use my IP
 
-    if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
+    if ((rv = getaddrinfo("127.0.0.1", PORT, &hints, &servinfo)) != 0) {
         fprintf(stderr, "Tiny > getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
     }

@@ -1,48 +1,54 @@
 #include "../src/include/tiny.h"
 
 int path_to_int(const char *path) {
-    //printf("path is %s\n", path);
-    if (strcmp(path, "/") == 0) return 1;
-    if (strcmp(path, "/rocket.png") == 0) return 2;
-    if (strcmp(path, "/fonts/iosevka-regular.woff") == 0) return 3;
-    if (strcmp(path, "/fonts/iosevka-regular.woff2") == 0) return 4;
+    // printf("path is %s\n", path);
+    if (strcmp(path, "/") == 0)
+        return 1;
+    if (strcmp(path, "/rocket.png") == 0)
+        return 2;
+    if (strcmp(path, "/fonts/iosevka-regular.woff") == 0)
+        return 3;
+    if (strcmp(path, "/fonts/iosevka-regular.woff2") == 0)
+        return 4;
     return 0; // default case
 }
-
 
 char *parse_path(const char *path) {
     int val = path_to_int(path);
 
     switch (val) {
-        case 1: return "./static/index.html";
-        case 2: return "./static/rocket.png";
-        case 3: return "./static/fonts/iosevka-regular.woff";
-        case 4: return "./static/fonts/iosevka-regular.woff2";
+    case 1:
+        return "./static/index.html";
+    case 2:
+        return "./static/rocket.png";
+    case 3:
+        return "./static/fonts/iosevka-regular.woff";
+    case 4:
+        return "./static/fonts/iosevka-regular.woff2";
     }
     return NULL;
 }
 
-int send_all(int s, char *buf, int *len) {
-    int total = 0;         // how many bytes have we sent
-    int bytes_left = *len; // how many we have left to send
-    int n;
+int send_all(int s, const char *buf, size_t len) {
+    size_t total = 0; // how many bytes have we sent
+    ssize_t n;
 
-    while(total < *len) {
-        n = send(s, buf+total, bytes_left, 0);
-        if (n == -1) { break; }
-        total += n;
-        bytes_left -= n;
+    while (total < len) {
+        n = send(s, buf + total, len - total, 0);
+        if (n <= 0) {
+            return -1;
+        }
+        total += (size_t)n;
     }
-    *len = total;          //return number actually sent header_len
 
-    return n == -1 ? -1:0; // return -1 on failure, 0 on success
+    return 0;
 }
 
 void send_file(int sock_fd, const char *path) {
     FILE *f = fopen(path, "rb");
     if (!f) {
         const char *err = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
-        send_all(sock_fd, (char*)err, &(int){strlen(err)});
+        send_all(sock_fd, (char *)err, strlen(err));
         close(sock_fd);
         return;
     }
@@ -53,25 +59,24 @@ void send_file(int sock_fd, const char *path) {
 
     char header[256];
     snprintf(header, sizeof(header),
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: %s\r\n"
-            "Content-Length: %ld\r\n"
-            "\r\n",
-            strstr(path, ".png") ? "image/png" :
-            strstr(path, ".woff") ? "font/woff" :
-            "text/html",
-            size);
-    int hlen = (int)strlen(header); 
-    if (send_all(sock_fd, header, &hlen) == -1) {
+             "HTTP/1.1 200 OK\r\n"
+             "Content-Type: %s\r\n"
+             "Content-Length: %ld\r\n"
+             "\r\n",
+             strstr(path, ".png") ? "image/png" : strstr(path, ".woff") ? "font/woff"
+                                                                        : "text/html",
+             size);
+    size_t hlen = strlen(header);
+    if (send_all(sock_fd, header, hlen) == -1) {
         fclose(f);
         close(sock_fd);
         return;
     }
-    
+
     char buf[BUFFER_SIZE] = {0};
-    int n_read = 0; 
+    size_t n_read = 0;
     while ((n_read = fread(buf, sizeof(buf[0]), BUFFER_SIZE, f)) > 0) {
-        if (send_all(sock_fd, buf, &n_read) == -1) {
+        if (send_all(sock_fd, buf, n_read) == -1) {
             perror("send");
             break;
         }
@@ -84,17 +89,18 @@ void sigchld_handler(int s) {
     (void)s; // quite unused variable warning
     // waitpid() might overwrite errno, so we save and restore it:
     int saved_errno = errno;
-    while(waitpid(-1, NULL, WNOHANG) > 0);
+    while (waitpid(-1, NULL, WNOHANG) > 0)
+        ;
     errno = saved_errno;
 }
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa) {
     if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
+        return &(((struct sockaddr_in *)sa)->sin_addr);
     }
 
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+    return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
 int main() {
@@ -111,7 +117,7 @@ int main() {
     char *path;
     char *protocol;
     int rv, numbytes;
-    
+
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -121,7 +127,7 @@ int main() {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
     }
-    
+
     // loop through all the results and bind to the first we can
     for (p = servinfo; p != NULL; p = p->ai_next) {
         if ((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
@@ -142,7 +148,7 @@ int main() {
         break;
     }
 
-    freeaddrinfo(servinfo); //all done with this structure
+    freeaddrinfo(servinfo); // all done with this structure
 
     if (p == NULL) {
         fprintf(stderr, "server: failed to bind\n");
@@ -176,34 +182,27 @@ int main() {
         if (!fork()) {
             close(sock_fd); // child does not need the listner
 
-        
             if ((numbytes = recv(new_fd, buf, sizeof(buf) - 1, 0)) == -1) {
                 perror("recv");
                 exit(EXIT_FAILURE);
             }
             buf[numbytes] = '\0';
-            printf("server: received %d bytes\n'%s'\n",numbytes, buf); 
-        
+            printf("server: received %d bytes\n'%s'\n", numbytes, buf);
+
             // fetch HTTP method
             token = strtok(buf, " ");
-            method = token; 
-            // fetch uri 
+            method = token;
+            // fetch path
             token = strtok(NULL, " ");
             path = token;
             // fetch protocol
             token = strtok(NULL, "\n");
             protocol = token;
 
-            printf("method: %s\npath: %s\nprotocol: %s\n", method, path, protocol);
-            //while(token != NULL) {
-            //    printf(" %s\n", token);
-            //    token = strtok(NULL, " ");
-            //}
             if (strcmp(method, "GET") != 0) {
                 printf("method not GET");
                 continue;
             }
-            printf("protocol is: %s\n", protocol);
 
             const char *file = parse_path(path);
             send_file(new_fd, file);
@@ -214,6 +213,6 @@ int main() {
         // parent closes original new_fd
         close(new_fd);
     }
-        close(sock_fd);
+    close(sock_fd);
     return 0;
 }

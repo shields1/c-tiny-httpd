@@ -18,7 +18,7 @@
 
 int path_to_int(const char *path);
 char *parse_path(const char *path);
-int send_all(int s, char *buf, int *len);
+int send_all(int s, const char *buf, size_t len);
 void send_file(int sock_fd, const char *path);
 void sigchld_handler(int s);
 void *get_in_addr(struct sockaddr *sa);

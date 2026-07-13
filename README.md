@@ -1,58 +1,260 @@
-# My simple http server written in C
+# Tiny — Simple HTTP Server Written in C
+
+A small HTTP server written from scratch in C.
+
+The goal of this project is to understand how HTTP servers work internally:
+from raw TCP sockets, to request handling, to event-driven architectures.
+
+## Current features
+
+- TCP socket server
+- IPv4 and IPv6 support
+- HTTP GET handling
+- Static file serving
+- MIME type detection
+- nginx reverse proxy deployment
+- systemd service support
+
+---
 
 # TODO
 
-* Replace fork() per request with a worker model (forking every connection is expensive).
-* Add graceful shutdown on SIGTERM so systemd can stop it cleanly.
-* Add a PID/service user that is not www-data.
-* Add access logging.
-* Add SIGPIPE handling to prevent  one bad client can kill your whole Tiny process
+## Server improvements
 
-# Add to systemservices
+- Replace `fork()` per request with a worker/event-driven model.
+  Forking a new process for every connection is expensive.
 
-1) Create directory for the server binary
-    sudo mkdir -p /opt/tiny
-2) Copy the binary and the static files
-    sudo cp ~/c-tiny-http-server/tiny /opt/tiny/
-    sudo cp -r ~/c-tiny-http-server/static /opt/tiny/
-3) Create a systemd service
-    sudo vim /etc/systemd/system/tiny.service
-and add
-        [Unit]
-    Description=Tiny C HTTP Server
-    After=network.target
+- Add graceful shutdown on `SIGTERM` so systemd can stop the server cleanly.
 
-    [Service]
-    Type=simple
+- Add a dedicated service user instead of running as `www-data`.
 
-    ExecStart=/opt/tiny/tiny
+- Add access logging.
 
-    WorkingDirectory=/opt/tiny
+- Add `SIGPIPE` handling to prevent a disconnected client from terminating the server.
 
-    Restart=on-failure
-    RestartSec=5
+- Improve HTTP parsing:
+  - handle malformed requests
+  - validate request methods
+  - improve error responses
 
-    User=www-data
-    Group=www-data
+- Add optional HTTP keep-alive support.
 
-   # Security hardening
+---
 
-    NoNewPrivileges=true
-    PrivateTmp=true
+# Development roadmap
 
-    [Install]
-    WantedBy=multi-user.target
-4) Set ownership
-    sudo chown -R www-data:www-data /opt/tiny
-5) Tell systemd to reload
-    sudo systemctl daemon-reload
-6) Enable at boot
-    sudo systemctl enable tiny
-7) Start server
-    sudo systemctl start tiny
-8) Check status
-    sudo systemctl status tiny
-9) Check logs
-    sudo journalctl -u tiny -f
-10) Test
-    curl -v <https://tiny.shields.nu/>
+## Step 1: Finish the current fork-based server
+
+The current implementation is the baseline.
+
+Add:
+
+- proper HTTP parsing
+- better error handling
+- logging
+- graceful shutdown
+- improved request handling
+
+Do not throw this version away. It is useful as a reference implementation.
+
+---
+
+## Step 2: Create experimental branches
+
+Example:
+
+```
+tiny/
+├── master          # fork-per-connection version
+├── poll-version    # poll() based event loop
+├── epoll-version   # Linux epoll implementation
+└── libuv-version   # libuv based implementation
+```
+
+This makes it possible to compare different server architectures.
+
+Reference:
+
+https://eli.thegreenplace.net/2017/concurrent-servers-part-1-introduction/
+
+---
+
+# Running as a systemd service
+
+## 1. Create a directory for the server
+
+```bash
+sudo mkdir -p /opt/tiny
+```
+
+## 2. Copy the binary and static files
+
+```bash
+sudo cp ~/c-tiny-http-server/tiny /opt/tiny/
+sudo cp -r ~/c-tiny-http-server/static /opt/tiny/
+```
+
+## 3. Create the systemd service
+
+Create:
+
+```bash
+sudo vim /etc/systemd/system/tiny.service
+```
+
+Add:
+
+```ini
+[Unit]
+Description=Tiny C HTTP Server
+After=network.target
+
+[Service]
+Type=simple
+
+ExecStart=/opt/tiny/tiny
+WorkingDirectory=/opt/tiny
+
+Restart=on-failure
+RestartSec=5
+
+User=www-data
+Group=www-data
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## 4. Set ownership
+
+```bash
+sudo chown -R www-data:www-data /opt/tiny
+```
+
+## 5. Reload systemd
+
+```bash
+sudo systemctl daemon-reload
+```
+
+## 6. Enable service at boot
+
+```bash
+sudo systemctl enable tiny
+```
+
+## 7. Start the server
+
+```bash
+sudo systemctl start tiny
+```
+
+## 8. Check status
+
+```bash
+sudo systemctl status tiny
+```
+
+## 9. Check logs
+
+```bash
+sudo journalctl -u tiny -f
+```
+
+## 10. Test
+
+```bash
+curl -v https://tiny.shields.nu/
+```
+
+---
+
+# Deployment architecture
+
+Current setup:
+
+```
+Internet
+    |
+    v
+ nginx
+    |
+    v
+ Tiny C HTTP Server
+    |
+    v
+ static files
+```
+
+nginx handles:
+
+- TLS termination
+- HTTPS certificates
+- public networking
+
+Tiny handles:
+
+- TCP connections
+- HTTP requests
+- file serving
+- application logic
+
+---
+
+# Future architecture
+
+The current server uses:
+
+```
+one process per connection
+```
+
+The long-term goal is:
+
+```
+one event loop handling many connections
+```
+
+Development path:
+
+```
+fork()
+   |
+   v
+poll()
+   |
+   v
+epoll()
+   |
+   v
+libuv
+```
+
+The final architecture:
+
+```
+Client connections
+        |
+        v
+    Event loop
+        |
+        +-- socket readable
+        |
+        +-- socket writable
+        |
+        +-- timers
+```
+
+---
+
+# Learning resources
+
+Beejs Network Guide:
+https://beej.us/guide/bgnet/html/
+
+Concurrent server development:
+https://eli.thegreenplace.net/2017/concurrent-servers-part-1-introduction/

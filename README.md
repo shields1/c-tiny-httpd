@@ -1,6 +1,6 @@
-# Tiny — Simple HTTP Server Written in C
+# tinyhttpd — Simple HTTP Server Written in C
 
-A small HTTP server written from scratch in C.
+A small HTTP daemon written from scratch in C.
 
 The goal of this project is to understand how HTTP servers work internally:
 from raw TCP sockets, to request handling, to event-driven architectures.
@@ -24,7 +24,7 @@ from raw TCP sockets, to request handling, to event-driven architectures.
 - Replace `fork()` per request with a worker/event-driven model.
   Forking a new process for every connection is expensive.
 
-- Add graceful shutdown on `SIGTERM` so systemd can stop the server cleanly.
+- Add graceful shutdown on `SIGTERM` so systemd can stop the daemon cleanly.
 
 - Add a dedicated service user instead of running as `www-data`.
 
@@ -43,7 +43,7 @@ from raw TCP sockets, to request handling, to event-driven architectures.
 
 # Development roadmap
 
-## Step 1: Finish the current fork-based server
+## Step 1: Complete the current fork-based server
 
 The current implementation is the baseline.
 
@@ -64,11 +64,11 @@ Do not throw this version away. It is useful as a reference implementation.
 Example:
 
 ```
-tiny/
-├── master          # fork-per-connection version
-├── poll-version    # poll() based event loop
-├── epoll-version   # Linux epoll implementation
-└── libuv-version   # libuv based implementation
+tinyhttpd/
+├── master              # fork-per-connection version
+├── poll-version        # poll() based event loop
+├── epoll-version       # Linux epoll implementation
+└── libuv-version       # libuv based implementation
 ```
 
 This makes it possible to compare different server architectures.
@@ -79,19 +79,19 @@ https://eli.thegreenplace.net/2017/concurrent-servers-part-1-introduction/
 
 ---
 
-# Running as a systemd service
+# Running as a systemd daemon
 
-## 1. Create a directory for the server
+## 1. Create a directory for the daemon
 
 ```bash
-sudo mkdir -p /opt/tiny
+sudo mkdir -p /opt/tinyhttpd
 ```
 
 ## 2. Copy the binary and static files
 
 ```bash
-sudo cp ~/c-tiny-http-server/tiny /opt/tiny/
-sudo cp -r ~/c-tiny-http-server/static /opt/tiny/
+sudo cp ~/c-tiny-http-server/tinyhttpd /opt/tinyhttpd/
+sudo cp -r ~/c-tiny-http-server/static /opt/tinyhttpd/
 ```
 
 ## 3. Create the systemd service
@@ -99,27 +99,27 @@ sudo cp -r ~/c-tiny-http-server/static /opt/tiny/
 Create:
 
 ```bash
-sudo vim /etc/systemd/system/tiny.service
+sudo vim /etc/systemd/system/tinyhttpd.service
 ```
 
 Add:
 
 ```ini
 [Unit]
-Description=Tiny C HTTP Server
+Description=tinyhttpd C HTTP daemon
 After=network.target
 
 [Service]
 Type=simple
 
-ExecStart=/opt/tiny/tiny
-WorkingDirectory=/opt/tiny
+ExecStart=/opt/tinyhttpd/tinyhttpd
+WorkingDirectory=/opt/tinyhttpd
 
 Restart=on-failure
 RestartSec=5
 
-User=www-data
-Group=www-data
+User=tinyhttpd
+Group=tinyhttpd
 
 # Security hardening
 NoNewPrivileges=true
@@ -129,43 +129,49 @@ PrivateTmp=true
 WantedBy=multi-user.target
 ```
 
-## 4. Set ownership
+## 4. Create the service user
 
 ```bash
-sudo chown -R www-data:www-data /opt/tiny
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin tinyhttpd
 ```
 
-## 5. Reload systemd
+## 5. Set ownership
+
+```bash
+sudo chown -R tinyhttpd:tinyhttpd /opt/tinyhttpd
+```
+
+## 6. Reload systemd
 
 ```bash
 sudo systemctl daemon-reload
 ```
 
-## 6. Enable service at boot
+## 7. Enable the daemon at boot
 
 ```bash
-sudo systemctl enable tiny
+sudo systemctl enable tinyhttpd
 ```
 
-## 7. Start the server
+## 8. Start the daemon
 
 ```bash
-sudo systemctl start tiny
+sudo systemctl start tinyhttpd
 ```
 
-## 8. Check status
+## 9. Check status
 
 ```bash
-sudo systemctl status tiny
+sudo systemctl status tinyhttpd
 ```
 
-## 9. Check logs
+## 10. Check logs
 
 ```bash
-sudo journalctl -u tiny -f
+sudo journalctl -u tinyhttpd -f
 ```
 
-## 10. Test
+## 11. Test
 
 ```bash
 curl -v https://tiny.shields.nu/
@@ -184,7 +190,7 @@ Internet
  nginx
     |
     v
- Tiny C HTTP Server
+ tinyhttpd
     |
     v
  static files
@@ -196,7 +202,7 @@ nginx handles:
 - HTTPS certificates
 - public networking
 
-Tiny handles:
+tinyhttpd handles:
 
 - TCP connections
 - HTTP requests

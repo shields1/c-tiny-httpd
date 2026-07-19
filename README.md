@@ -265,6 +265,8 @@ https://beej.us/guide/bgnet/html/
 Concurrent server development:
 https://eli.thegreenplace.net/2017/concurrent-servers-part-1-introduction/
 
+Http RFC9110:
+https://datatracker.ietf.org/doc/html/rfc9110
 # Testing
 
 See [tests/README.md](tests/README.md) for the test suite.

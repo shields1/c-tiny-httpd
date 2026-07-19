@@ -1,6 +1,4 @@
-# tinyhttpd — Simple HTTP Server Written in C
-
-A small HTTP daemon written from scratch in C.
+# tinyhttpd — A tiny HTTP daemon written in C.
 
 The goal of this project is to understand how HTTP servers work internally:
 from raw TCP sockets, to request handling, to event-driven architectures.

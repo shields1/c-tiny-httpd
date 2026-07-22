@@ -37,6 +37,12 @@ from raw TCP sockets, to request handling, to event-driven architectures.
 
 - Add optional HTTP keep-alive support.
 
+- Support additional http headers, ex:
+   - Accept-Encoding
+   - Accept
+   - Cache-Control
+   - Cookie
+   - Referer
 ---
 
 # Development roadmap

@@ -263,8 +263,17 @@ https://beej.us/guide/bgnet/html/
 Concurrent server development:
 https://eli.thegreenplace.net/2017/concurrent-servers-part-1-introduction/
 
+Mdn Http:
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Overview
+
 Http RFC9110:
 https://datatracker.ietf.org/doc/html/rfc9110
+
+Http RFC9112:
+https://www.rfc-editor.org/rfc/rfc9112.html
+
 # Testing
+
+
 
 See [tests/README.md](tests/README.md) for the test suite.

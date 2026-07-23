@@ -94,8 +94,8 @@ sudo mkdir -p /opt/tinyhttpd
 ## 2. Copy the binary and static files
 
 ```bash
-sudo cp ~/c-tiny-http-server/tinyhttpd /opt/tinyhttpd/
-sudo cp -r ~/c-tiny-http-server/static /opt/tinyhttpd/
+sudo cp ~/c-tiny-httpd/bin/tinyhttpd /opt/tinyhttpd/
+sudo cp -r ~/c-tiny-httpd/static /opt/tinyhttpd/
 ```
 
 ## 3. Create the systemd service
